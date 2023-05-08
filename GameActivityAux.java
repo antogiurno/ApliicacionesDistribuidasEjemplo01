@@ -2,105 +2,178 @@ package com.example.ejemplo01;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.content.Context;
+import android.content.Intent;
 import android.os.Bundle;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.BaseAdapter;
 import android.widget.Button;
+import android.widget.GridView;
 import android.widget.TextView;
+import androidx.appcompat.app.AlertDialog;
+import android.util.Log;
 import android.widget.Toast;
 
-public class GameActivity extends AppCompatActivity implements View.OnClickListener {
 
-    private Button[][] button = new Button[3][3];
-    private TextView textViewPlayer1;
-    private TextView textViewPlayer2;
 
-    private int player1Points;
-    private int player2Points;
+public class GameActivity extends AppCompatActivity {
 
-    private boolean player1Turn = true;
+    private Button[] buttons;
+    private int[] board;
 
-    private int roundCount;
+    private int player = 1;
+    private int computer = 2;
+
+    private int empty = 0;
+
+    private boolean gameActive = true;
+
+    private int[][] winningPositions = new int[][]{{0,1,2},{3,4,5},{6,7,8},{0,3,6},{1,4,7},{2,5,8},{0,4,8},{2,4,6}};
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_game);
+        setContentView(R.layout.game_activity);
 
-        textViewPlayer1 = findViewById(R.id.text_view_p1);
-        textViewPlayer2 = findViewById(R.id.text_view_p2);
+        buttons = new Button[9];
+        board = new int[9];
 
-        for(int i = 0; i < 3; i++) {
-            for(int j = 0; j < 3; j++) {
-                String buttonID = "button_" + i + j;
-                int resID = getResources().getIdentifier(buttonID, "id", getPackageName());
-                button[i][j] = findViewById(resID);
-                button[i][j].setOnClickListener(this);
-            }
+        for(int i = 0; i < 9; i++) {
+            String buttonId = "button_" + i;
+            int resourceId = getResources().getIdentifier(buttonId, "id", getPackageName());
+            buttons[i] = findViewById(resourceId);
+            board[i] = empty;
+            buttons[i].setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (((Button) v).getText().toString().equals("")) {
+                        int tag = Integer.parseInt(v.getTag().toString());
+                        updateBoard(tag, player);
+                        checkWinner();
+                        if (gameActive) {
+                            computerMove();
+                        }
+                    }
+                }
+            });
         }
-
-        Button buttonReset = findViewById(R.id.button_reset);
-        buttonReset.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                resetGame();
-            }
-        });
     }
 
-    @Override
-    public void onClick(View v) {
-        if (!((Button) v).getText().toString().equals("")) {
-            return;
-        }
+    private void computerMove() {
+        int bestPosition = findBestMove();
+        updateBoard(bestPosition, computer);
+        checkWinner();
+    }
 
-        if (player1Turn) {
-            ((Button) v).setText("X");
+    private int findBestMove() {
+        int bestMove = -1;
+        int bestScore = -1000;
+        for (int i = 0; i < 9; i++) {
+            if (board[i] == empty) {
+                board[i] = computer;
+                int score = minimax(board, 0, false);
+                board[i] = empty;
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMove = i;
+                }
+            }
+        }
+        return bestMove;
+    }
+
+    private int minimax(int[] board, int depth, boolean isMaximizing) {
+        int result = checkGameState(board);
+        if (result != -2) {
+            return result;
+        }
+        if (isMaximizing) {
+            int bestScore = -1000;
+            for (int i = 0; i < 9; i++) {
+                if (board[i] == empty) {
+                    board[i] = computer;
+                    int score = minimax(board, depth + 1, false);
+                    board[i] = empty;
+                    bestScore = Math.max(score, bestScore);
+                }
+            }
+            return bestScore;
         } else {
-            ((Button) v).setText("O");
-        }
-
-        roundCount++;
-
-        if (checkForWin()) {
-            if (player1Turn) {
-                player1Wins();
-            } else {
-                player2Wins();
+            int bestScore = 1000;
+            for (int i = 0; i < 9; i++) {
+                if (board[i] == empty) {
+                    board[i] = player;
+                    int score = minimax(board, depth + 1, true);
+                    board[i] = empty;
+                    bestScore = Math.min(score, bestScore);
+                }
             }
-        } else if (roundCount == 9) {
-            draw();
+            return bestScore;
+        }
+    }
+
+    private void updateBoard(int position, int player) {
+        board[position] = player;
+        if (player == 1) {
+            buttons[position].setText("X");
         } else {
-            player1Turn = !player1Turn;
+            buttons[position].setText("O");
+        }
+    }
 
-            if(!player1Turn) {
-                makeMove();
+
+        private void checkWinner() {
+            int winner = -1; // -1 significa que aún no hay un ganador
+
+            // Comprobamos las filas
+            for (int i = 0; i < 9; i += 3) {
+                if (buttons[i].getText().equals(buttons[i + 1].getText()) &&
+                        buttons[i].getText().equals(buttons[i + 2].getText()) &&
+                        !buttons[i].getText().equals("")) {
+                    winner = i;
+                    break;
+                }
+            }
+
+            // Comprobamos las columnas
+            if (winner == -1) {
+                for (int i = 0; i < 3; i++) {
+                    if (buttons[i].getText().equals(buttons[i + 3].getText()) &&
+                            buttons[i].getText().equals(buttons[i + 6].getText()) &&
+                            !buttons[i].getText().equals("")) {
+                        winner = i;
+                        break;
+                    }
+                }
+            }
+
+            // Comprobamos las diagonales
+            if (winner == -1) {
+                if (buttons[0].getText().equals(buttons[4].getText()) &&
+                        buttons[0].getText().equals(buttons[8].getText()) &&
+                        !buttons[0].getText().equals("")) {
+                    winner = 0;
+                } else if (buttons[2].getText().equals(buttons[4].getText()) &&
+                        buttons[2].getText().equals(buttons[6].getText()) &&
+                        !buttons[2].getText().equals("")) {
+                    winner = 2;
+                }
+            }
+
+            // Si hay un ganador, actualizamos la UI y terminamos el juego
+            if (winner != -1) {
+                disableButtons();
+                if (winner == 0) {
+                    Toast.makeText(getApplicationContext(), "X es el ganador!", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(getApplicationContext(), "O es el ganador!", Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            // Si no hay un ganador y se han realizado 9 jugadas, entonces el juego termina en empate
+            if (winner == -1 && turn_count == 9) {
+                Toast.makeText(getApplicationContext(), "Empate!", Toast.LENGTH_SHORT).show();
             }
         }
-    }
-
-    private void makeMove() {
-        int[] move = minimax(2, "O");
-        button[move[0]][move[1]].setText("O");
-        player1Turn = true;
-        roundCount++;
-
-        if (checkForWin()) {
-            player2Wins();
-        } else if (roundCount == 9) {
-            draw();
-        }
-    }
-
-    private int[] minimax(int depth, String player) {
-        if (checkForWin() && player.equals("O")) {
-            return new int[]{-1, -1, 1};
-        } else if (checkForWin() && player.equals("X")) {
-            return new int[]{-1, -1, -1};
-        } else if (roundCount == 9) {
-            return new int[]{-1, -1, 0};
-        }
-
-        int[] bestMove = new int[3];
-
-        if (player.equals("O")) {
-            bestMove[2] = -1000;
